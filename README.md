@@ -8,4 +8,5 @@ For DataLogger in Arduino IDE:
 
 For Laptop:
 - Python 3.6+
-- Specify Port to be used
+- Run a fresh new instance for each sensor to connect to
+- Specify Port to be used in command line
