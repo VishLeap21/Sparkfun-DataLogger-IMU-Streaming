@@ -4,8 +4,8 @@
 #include "SparkFun_ISM330DHCX.h"
 
 // Wi-Fi credentials
-const char* ssid = "Batcave";
-const char* password = "Batcave!";
+const char* ssid = "SSID";
+const char* password = "Password";
 
 // UDP settings
 WiFiUDP udp;
