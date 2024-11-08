@@ -1,106 +1,88 @@
 import socket
-import argparse
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 import numpy as np
-import time
 
-# Parse command-line arguments for UDP port
-parser = argparse.ArgumentParser(description="Read IMU data from a specified UDP port.")
-parser.add_argument(
-    "--port", type=int, default=1233, help="UDP port number to listen on (default: 1233)"
-)
-args = parser.parse_args()
-UDP_PORT = args.port
 
 # UDP settings
+UDP_PORTS = [1231, 1232, 1233, 1234]
 UDP_IP = "0.0.0.0"    # Listen on all available IP addresses
-TIMEOUT = 1.0         # Timeout in seconds
+TIMEOUT = 0.01        # Timeout in seconds for non-blocking
 
-# Set up the socket for receiving UDP packets
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((UDP_IP, UDP_PORT))
-sock.settimeout(TIMEOUT)  # Set a timeout for the socket
+# Set up sockets for all IMUs
+sockets = []
+for port in UDP_PORTS:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((UDP_IP, port))
+    sock.settimeout(TIMEOUT)
+    sockets.append(sock)
 
-# Buffer length for longer history
-buffer_length = 100
+# Buffer length for history
+buffer_length = 500  # Reduced buffer size for faster updates
 
-# Data buffer for gyroscope magnitude
-gyro_magnitude = np.zeros(buffer_length)
+# Data buffers for binary outputs from all IMUs
+binary_outputs = [np.zeros(buffer_length) for _ in range(4)]
 
 # Set up the plot
 plt.style.use('ggplot')
 fig, ax = plt.subplots(figsize=(10, 6))
 
-# Plot setup for gyroscope magnitude (longer history)
-ax.set_title("Gyroscope Magnitude")
+# Plot setup for binary outputs
+ax.set_title("Sequence of Touching of Toys")
 ax.set_xlim(0, buffer_length)
-ax.set_ylim(-100, 600)  # Fixed Y-axis range
-ax.set_ylabel("Degrees per Second")  # Label for the Y-axis
+ax.set_ylim(-0.25, 1.25)  # Scale y-axis for binary values (0 or 1)
+# ax.set_ylabel("Touching or Not")
 ax.get_xaxis().set_visible(False)  # Hide the x-axis ticks
 
-# Create initial plot line with red color, no label
-line_gyro_magnitude, = ax.plot(gyro_magnitude, color='red')
+# Replace y-axis numbers with custom labels
+ax.set_yticks([0, 1])  # Positions for "Stationary" and "Touching"
+ax.set_yticklabels(["Stationary", "Touching"])  # Custom text labels
 
-# Threshold for changing color
-threshold = 50
 
-# Initial data check for UDP data availability
-print(f"Starting program. Waiting for UDP data on port {UDP_PORT}...")
-data_available = False
-while not data_available:
-    try:
-        data, _ = sock.recvfrom(1024)  # Attempt to receive data
-        data_available = True  # If data is received, mark as available
-    except socket.timeout:
-        print("No data received yet. Waiting for UDP data...")
-        time.sleep(1)  # Wait a moment before checking again
+# Create plot lines for all IMUs
+colors = ['blue', 'orange', 'green', 'red']
+lines = [
+    ax.plot(binary_outputs[i], label=f"Toy {i + 1}", color=colors[i])[0]
+    for i in range(4)
+]
+ax.legend(loc="upper right")
 
-print("UDP data stream detected. Starting plot...")
+# Threshold for binary output
+threshold = 15
 
 def update_plot(frame):
-    global gyro_magnitude
-    
-    # Try to receive UDP data
-    try:
-        data, _ = sock.recvfrom(1024)  # Buffer size is 1024 bytes
-        message = data.decode()
-        values = message.split(",")
+    global binary_outputs
 
-        # Parse values and calculate magnitude for gyroscope data only
-        if len(values) == 6:  # Expecting exactly 6 values (accel + gyro)
-            # Get the latest gyroscope readings and convert them to floats
-            gyro_x = float(values[3]) / 1000  # Gyro X, scaled
-            gyro_y = float(values[4]) / 1000  # Gyro Y, scaled
-            gyro_z = float(values[5]) / 1000  # Gyro Z, scaled
+    for i, sock in enumerate(sockets):
+        try:
+            data, _ = sock.recvfrom(1024)
+            values = data.decode().split(",")
 
-            # Calculate the magnitude of the gyroscope vector
-            magnitude = (gyro_x**2 + gyro_y**2 + gyro_z**2)**0.5
+            if len(values) == 3:  # Expecting exactly 6 values (accel + gyro)
+                gyro_x = float(values[0])
+                gyro_y = float(values[1])
+                gyro_z = float(values[2])
+                magnitude = (gyro_x**2 + gyro_y**2 + gyro_z**2)**0.5
 
-            # Shift all values one position to the left (rolling buffer)
-            gyro_magnitude = np.roll(gyro_magnitude, -1)
-            gyro_magnitude[-1] = magnitude
+                # Determine binary output (1 if above threshold, 0 otherwise)
+                binary_value = 1 if magnitude > threshold else 0
 
-            # Check the threshold and set line color
-            if magnitude > threshold:
-                line_gyro_magnitude.set_color('green')
-            else:
-                line_gyro_magnitude.set_color('red')
+                # Shift all values one position to the left (rolling buffer)
+                binary_outputs[i] = np.roll(binary_outputs[i], -1)
+                binary_outputs[i][-1] = binary_value
 
-            # Update plot data for gyroscope magnitude
-            line_gyro_magnitude.set_ydata(gyro_magnitude)
+                # Update the plot line for the current IMU
+                lines[i].set_ydata(binary_outputs[i])
 
-    except socket.timeout:
-        # If no data is received within the timeout period, do nothing
-        print("No data received. Waiting for UDP data...")
+        except socket.timeout:
+            pass  # No data received; continue
 
-    except Exception as e:
-        # Handle any other exceptions
-        print(f"Error: {e}")
+        except Exception as e:
+            print(f"Error with IMU {i + 1}: {e}")
 
-    return line_gyro_magnitude,
+    return lines
 
 # Animate the plot with a rolling buffer
-ani = FuncAnimation(fig, update_plot, interval=50)
+ani = FuncAnimation(fig, update_plot, interval=20)  # Reduced interval for faster updates
 plt.tight_layout()
 plt.show()
