@@ -36,19 +36,20 @@ ax.get_xaxis().set_visible(False)  # Hide the x-axis ticks
 
 # Replace y-axis numbers with custom labels
 ax.set_yticks([0, 1])  # Positions for "Stationary" and "Touching"
-ax.set_yticklabels(["Stationary", "Touching"])  # Custom text labels
+ax.set_yticklabels(["Stationary", "Moving"])  # Custom text labels
 
 
 # Create plot lines for all IMUs
-colors = ['blue', 'orange', 'green', 'red']
+colors = ['turquoise', 'lime', 'purple', 'red']
+toy_labels = ['Ball', 'Cube', 'Ball', 'Cube' ]
 lines = [
-    ax.plot(binary_outputs[i], label=f"Toy {i + 1}", color=colors[i])[0]
+    ax.plot(binary_outputs[i], label=toy_labels[i], color=colors[i], linewidth=3)[0]
     for i in range(4)
 ]
 ax.legend(loc="upper right")
 
 # Threshold for binary output
-threshold = 15
+threshold = 5
 
 def update_plot(frame):
     global binary_outputs
