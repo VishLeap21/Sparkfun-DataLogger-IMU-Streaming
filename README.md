@@ -29,6 +29,11 @@ This repository contains code to stream data from a SparkFun DataLogger IoT 9-Do
      ```bash
      pip install matplotlib argparse
      ```
+     or
+     ```bash
+     conda env create -f IMU_UDP.yml
+     ```     
+
 
 3. **SparkFun IMU Hardware**:
    - A SparkFun DataLogger IoT 9-DoF or similar ESP32-based board with an ISM330DHCX IMU.
